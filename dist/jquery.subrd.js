@@ -1,13 +1,13 @@
 /**
  * Simple-Unobtrusive-Bootstrap-Remote-Dialog - A simple and lightweight library to provide a Booststrap based modal with remotely loaded content
- * @version v0.1.0
+ * @version v0.1.1
  * @link https://github.com/amura11/Simple-Unobtrusive-Bootstrap-Remote-Dialog
  * @license MIT
  */
 (function(RemoteDialog, $, undefined) {
     var modalId = '#remote-dialog-modal';
 
-    defaults = {
+    RemoteDialog.defaults = {
         identifier: null,
         url: null,
         parser: defaultParser
@@ -50,21 +50,16 @@
         //Show/Hide events
         $('body').on('shown.bs.modal', modalId, triggerDialogEvent.bind(null, 'shown'));
         $('body').on('hidden.bs.modal', modalId, triggerDialogEvent.bind(null, 'hidden'));
-
-        //Button events
-        $('body').on('click', modalId + ' button', function(event) {
-            triggerDialogEvent($(event.target).attr('id'));
-        });
     }
 
     RemoteDialog.Show = function(options) {
         var modal = $(modalId);
         var content = modal.find('.modal-content');
 
-        var settings = $.extend(defaults, options);
+        var settings = $.extend(RemoteDialog.defaults, options);
 
         if (!settings.url || !settings.identifier) {
-            throw "Message and Identifier must be specified";
+            throw "Url and Identifier must be specified";
         }
 
         //Set the identifier
@@ -72,11 +67,8 @@
 
         //Load the conent
         $.ajax({
-            type: 'POST',
+            type: 'GET',
             url: settings.url,
-            data: {
-                html: blah
-            },
             success: function(result) {
                 content.html(settings.parser(result));
                 modal.modal('show');
