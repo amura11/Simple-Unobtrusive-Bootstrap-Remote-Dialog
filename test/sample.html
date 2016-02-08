@@ -1,0 +1,59 @@
+<html>
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="googlebot" content="noindex, nofollow">
+    <link rel="stylesheet" type="text/css" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.2.0/jquery.js"></script>
+    <script type="text/javascript" src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="../src/core.js"></script>
+    <script type="text/javascript">
+        $.ajax = function(options) {
+
+            if (options.url === "example.com/get") {
+                options.success(
+                    '\
+            <div class="modal-header">\
+                <h4 class="modal-title">Modal title</h4>\
+            </div>\
+            <div class="modal-body">\
+                <p style="height: 300px;">One fine body&hellip;</p>\
+                <button type="button" class="btn">Test</button>\
+            </div>\
+            <div class="modal-footer">\
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>\
+                <button data-confirm-message="Are you sure?" \
+                    data-confirm-accept-text="Yes" \
+                    data-confirm-cancel-text="No" \
+                    data-submit-url="example.com/submit" \
+                    data-auto-dismiss="true" \
+                    type="button" class="btn btn-primary">Save changes</button>\
+            </div>'
+                );
+            } else if (options.url === "example.com/submit") {
+                options.success();
+            }
+        };
+    $(function() {
+        $('body').on('loaded.dialog', '#my-dialog', function(){console.log('Dialog Loaded');});
+        $('body').on('load-error.dialog', '#my-dialog', function(){console.log('Dialog Load Error');});
+        $('body').on('shown.dialog', '#my-dialog', function(){console.log('Dialog Shown');});
+        $('body').on('hidden.dialog', '#my-dialog', function(){console.log('Dialog Hidden');});
+        $('body').on('confirm-accept.dialog', '#my-dialog', function(){console.log('Dialog Confirmation Accepted');});
+        $('body').on('confirm-cancel.dialog', '#my-dialog', function(){console.log('Dialog Confirmation Canceled');});
+        $('body').on('submit.dialog', '#my-dialog', function(){console.log('Dialog Submit Success');});
+        $('body').on('submit-error.dialog', '#my-dialog', function(){console.log('Dialog Submit Failure');});
+    });
+    </script>
+
+    <title>Remote Dialog</title>
+</head>
+
+<body>
+    <button type="button" class="btn" data-toggle="remote-dialog" data-url="example.com/get" data-identifier="my-dialog">
+        Show Remote Dialog
+    </button>
+</body>
+
+</html>

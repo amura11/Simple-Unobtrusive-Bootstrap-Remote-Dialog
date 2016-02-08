@@ -1,3 +1,22 @@
+(function($) {
+    $.fn.serializeFormJSON = function() {
+
+        var o = {};
+        var a = this.serializeArray();
+        $.each(a, function() {
+            if (o[this.name]) {
+                if (!o[this.name].push) {
+                    o[this.name] = [o[this.name]];
+                }
+                o[this.name].push(this.value || '');
+            } else {
+                o[this.name] = this.value || '';
+            }
+        });
+        return o;
+    };
+})(jQuery);
+
 (function(RemoteDialog, $, undefined) {
     var modalId = '#remote-dialog-modal';
 
@@ -14,6 +33,9 @@
         identifier: null,
         url: null
     };
+
+    RemoteDialog.Show = showDialog;
+    RemoteDialog.Hide = hideDialog;
 
     // jshint multistr:true
     RemoteDialog.modalTemplate = '\
@@ -64,14 +86,14 @@
             });
         });
 
-		$('body').on('click', modalId + ' .modal-footer button', handleButtonClickEvent);
+        $('body').on('click', modalId + ' .modal-footer button', handleButtonClickEvent);
 
         //Show/Hide events
         $('body').on('shown.bs.modal', modalId, triggerDialogEvent.bind(null, 'shown'));
         $('body').on('hidden.bs.modal', modalId, triggerDialogEvent.bind(null, 'hidden'));
     }
 
-    RemoteDialog.Show = function(options) {
+    function showDialog(options) {
         var modal = $(modalId);
         var content = modal.find('.modal-content');
         var settings = $.extend(RemoteDialog.defaults, options);
@@ -86,23 +108,64 @@
 
         //Load the conent
         RemoteDialog.handlers.load(settings.url);
-    };
+    }
+
+    function hideDialog() {
+        var modal = $(modalId);
+        var content = modal.find('.modal-content');
+
+        content.empty();
+        content.removeAttr('id');
+
+        modal.modal('hide');
+    }
 
     function handleButtonClickEvent(event) {
         var modal = $(modalId);
         var buttonOptions = parseButtonAttributes($(event.target));
 
-        if(buttonOptions.confirm){
-        	showConfirmation(buttonOptions, modal);
-        } else if(buttonOptions.confirmAccept){
-        	hideConfirmation(buttonOptions, modal);
-        } else if(buttonOptions.confirmCancel){
-        	hideConfirmation(buttonOptions, modal);
+        if (buttonOptions.confirm) {
+            showConfirmation(buttonOptions, modal);
+        } else if (buttonOptions.confirmAccept) {
+            confirmAcceptClickEvent(buttonOptions, modal);
+        } else if (buttonOptions.confirmCancel) {
+            confirmCancelClickEvent(buttonOptions, modal);
+        } else if (buttonOptions.submit){
+            submitDialogClickEvent(buttonOptions, modal);
+        } else if (buttonOptions.reload){
+            reloadDialogClickEvent(buttonOptions, modal);
         }
     }
 
-	function hideConfirmation(buttonOptions, modal){
-    	var body = modal.find('.modal-body');
+    function confirmCancelClickEvent(buttonOptions, modal) {
+        triggerDialogEvent('confirm-cancel');
+        hideConfirmation(buttonOptions, modal);
+    }
+
+    function confirmAcceptClickEvent(buttonOptions, modal) {
+        triggerDialogEvent('confirm-accept');
+
+        if (!buttonOptions.autoDismiss)
+            hideConfirmation(buttonOptions, modal);
+
+        if (buttonOptions.submit) {
+            submitDialog(buttonOptions, modal);
+        } else {
+            if (buttonOptions.autoDismiss)
+                hideDialog();
+        }
+    }
+
+    function submitDialogClickEvent(buttonOptions, modal){
+        submitDialog(buttonOptions, modal);
+    }
+
+    function reloadDialogClickEvent(buttonOptions, modal){
+        RemoteDialog.handlers.load(options.reloadUrl);
+    }
+
+    function hideConfirmation(buttonOptions, modal) {
+        var body = modal.find('.modal-body');
         var footer = modal.find('.modal-footer');
 
         body.find('#confirmation-container').remove();
@@ -111,53 +174,64 @@
         footer.find('*').show();
     }
 
-	function showConfirmation(buttonOptions, modal){
-    	var body = modal.find('.modal-body');
+    function showConfirmation(buttonOptions, modal) {
+        var body = modal.find('.modal-body');
         var footer = modal.find('.modal-footer');
+        var bodyHeight = body.innerHeight();
 
-		var confirmationContainer = body.find('#confirmation-message');
+        var confirmationContainer = body.find('#confirmation-message');
         var confirmationButtons = footer.find('#confirmation-buttons');
 
-        if(confirmationContainer.length ===0){
-        	body.find('*').hide();
+        //If the container isn't on the page, add it (so we don't add it more than once)
+        if (confirmationContainer.length === 0) {
+            body.find('*').hide();
             confirmationContainer = $(RemoteDialog.confirmMessageTemplate).prependTo(body);
+            body.css({
+                'min-height': bodyHeight + "px"
+            });
         }
 
-        if(confirmationButtons.length ===0){
-        	footer.find('*').hide();
-        	confirmationButtons = $(RemoteDialog.confirmButtonsTemplate).appendTo(footer);
+        //If the buttons aren't on the page, add it (so we don't add it more than once)
+        if (confirmationButtons.length === 0) {
+            footer.find('*').hide();
+            confirmationButtons = $(RemoteDialog.confirmButtonsTemplate).appendTo(footer);
         }
 
+        //Set the message and buttons
         confirmationContainer.find('#confirmation-message').html(buttonOptions.confirmMessage);
         confirmationButtons.find('button[data-confirm-cancel]').html(buttonOptions.confirmCancelText);
         confirmationButtons.find('button[data-confirm-accept]').html(buttonOptions.confirmAcceptText);
 
         //If the original button had a reload or submit add them to the accept button
-        if(buttonOptions.submit || buttonOptions.reload){
-        	confirmationButtons
-            .find('button[data-confirm-accept]')
-            .attr('data-submit-url', buttonOptions.submitUrl)
-            .attr('data-reload-url', buttonOptions.reloadUrl)
+        if (buttonOptions.submit || buttonOptions.reload) {
+            confirmationButtons
+                .find('button[data-confirm-accept]')
+                .data('submitUrl', buttonOptions.submitUrl)
+                .data('reloadUrl', buttonOptions.reloadUrl);
         }
+
+        //Add the auto dismiss to the accept button
+        confirmationButtons
+            .find('button[data-confirm-accept]')
+            .data('autoDismiss', buttonOptions.autoDismiss);
+    }
+
+    function submitDialog(buttonOptions, modal) {
+        var form = modal.find('.modal-body form');
+
+        var formData = form.length > 0 ? form.serializeFormJSON() : undefined;
+
+        RemoteDialog.handlers.submit(formData, buttonOptions);
     }
 
     function parseButtonAttributes(button) {
-        var options = {
-            confirm: button.attr('data-confirm'),
-            confirmMessage: button.attr('data-confirm-message'),
-            confirmAccept: button.attr('data-confirm-accept'),
-            confirmAcceptText: button.attr('data-confirm-accept-text'),
-            confirmCancel: button.attr('data-confirm-cancel'),
-            confirmCancelText: button.attr('data-confirm-cancel-text'),
-            reload: button.attr('data-reload'),
-            reloadUrl: button.attr('data-reload-url'),
-            submit: button.attr('data-submit'),
-            submitUrl: button.attr('data-submit-url')
-        };
+        var options = button.data();
 
+        //Set the boolean values to true or false
         options.confirm = (options.confirm === undefined ? true : options.confirm) && options.confirmMessage !== undefined;
-        options.reload = (options.reload === undefined ? true : options.reload) && options.confirmMessage !== undefined;
-        options.submit = (options.submit === undefined ? true : options.submit) && options.confirmMessage !== undefined;
+        options.reload = (options.reload === undefined ? true : options.reload) && options.reloadUrl !== undefined;
+        options.submit = (options.submit === undefined ? true : options.submit) && options.submitUrl !== undefined;
+        options.autoDismiss = (options.autoDismiss === undefined ? false : options.autoDismiss);
 
         return options;
     }
@@ -176,7 +250,7 @@
         var content = modal.find('.modal-content');
 
         content.html(data);
-        triggerDialogEvent('load');
+        triggerDialogEvent('loaded');
         $(modalId).modal('show');
     }
 
@@ -184,25 +258,33 @@
         triggerDialogEvent('load-error', [xhr, ajaxOptions, thrownError]);
     }
 
-    function defaultSubmitHandler(formData, url) {
+    function defaultSubmitHandler(formData, buttonOptions) {
         $.ajax({
-            url: url,
+            url: buttonOptions.submitUrl,
             data: formData,
             method: 'POST',
             success: RemoteDialog.handlers.submitSuccess,
-            error: RemoteDialog.handlers.submitError
+            error: RemoteDialog.handlers.submitError,
+            reload: buttonOptions.reload,
+            reloadUrl: buttonOptions.reloadUrl,
+            autoDismiss: buttonOptions.autoDismiss
         });
     }
 
     function defaultSubmitSuccessHandler(data) {
         var modal = $(modalId);
-
+        var options = this;
         triggerDialogEvent('submit');
-        modal.modal('hide');
+
+        if (options.reload) {
+            RemoteDialog.handlers.load(options.reloadUrl);
+        } else if (options.autoDismiss) {
+            modal.modal('hide');
+        }
     }
 
     function defaultSubmitErrorHandler(jqXHR, textStatus, errorThrown) {
-        triggerDialogEvent('submit-error', [xhr, ajaxOptions, thrownError]);
+        triggerDialogEvent('submit_error', [xhr, ajaxOptions, thrownError]);
     }
 
     function triggerDialogEvent(eventName, parameters) {
@@ -210,8 +292,7 @@
         var target = modal.find('.modal-content');
         var identifier = modal.attr('data-identifier');
 
-        target.trigger(eventName + '.dialog', parameters);
-        target.trigger(eventName + '.' + identifier, parameters);
+        target.trigger(eventName + '.dialog');
     }
 
     $(function() {
